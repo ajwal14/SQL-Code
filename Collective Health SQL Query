@@ -1,0 +1,56 @@
+/* Using e-commerce data in a Postgre database, the following query calculates retention rates for first-time customers by year and month */
+/*Tables and Schema: 
+                    Table: Orders ; Schema: order_id, order_date, order_customer_id, order_status
+                    Table: Customers ; Schema: customer_id, customer_fname, customer_lname, customer_email, customer_password, customer_street, customer_city, customer_state, customer_zipcode
+
+/* The "cohort" CTE finds the first order date by customer_id and groups them into year and month (the cohort) */
+WITH cohort AS (
+    SELECT
+        DATE_TRUNC('month', o.order_date) AS cohort_month,
+        EXTRACT(YEAR FROM o.order_date) AS cohort_year,
+        c.customer_id,
+        MIN(o.order_date) AS first_order_date
+    FROM orders o
+    INNER JOIN customers c ON o.order_customer_id = c.customer_id
+    GROUP BY cohort_month, cohort_year, c.customer_id
+),
+
+/* The "retention_date" CTE calculates the number of orders made by each customer and groups 
+them by order month and year as well as the cohort month */
+
+retention_data AS (
+    SELECT
+        EXTRACT(YEAR FROM o.order_date) AS order_year,
+        DATE_TRUNC('month', o.order_date) AS order_month,
+        c.customer_id,
+        DATE_TRUNC('month', ch.first_order_date) AS cohort_month,
+        COUNT(DISTINCT o.order_id) AS order_count
+    FROM orders o
+    INNER JOIN customers c ON o.order_customer_id = c.customer_id
+	  INNER JOIN cohort ch ON c.customer_id=ch.customer_id
+    GROUP BY order_year, order_month, c.customer_id, DATE_TRUNC('month', ch.first_order_date)
+),
+
+/* The "retention_rate" CTE calculates retained customers for each cohort and compares the number of customers retained in subsequent months to the initial cohort size */
+
+retention_rate AS (
+    SELECT
+        cohort.cohort_year,
+        cohort.cohort_month,
+        COUNT(DISTINCT CASE WHEN rd.order_year = cohort.cohort_year AND rd.order_month = cohort.cohort_month THEN rd.customer_id END) AS cohort_size,
+        COUNT(DISTINCT CASE WHEN rd.order_year = cohort.cohort_year AND rd.order_month > cohort.cohort_month THEN rd.customer_id END) AS retained_customers
+    FROM cohort
+    LEFT JOIN retention_data rd ON cohort.customer_id = rd.customer_id AND cohort.cohort_month = rd.cohort_month
+    GROUP BY cohort.cohort_year, cohort.cohort_month
+)
+
+/* The main query shows cohort year and month, the number of customers in the cohort, the number of retained_customers (made subsequent purchases), and calculates the retention_rate */
+
+SELECT
+    cohort_year,
+    cohort_month,
+    cohort_size,
+    retained_customers,
+    ROUND((retained_customers::numeric / cohort_size::numeric) * 100, 2) AS retention_rate
+FROM retention_rate
+ORDER BY cohort_year, cohort_month;
