@@ -38,7 +38,7 @@ retention_rate AS (
         cohort.cohort_year,
         cohort.cohort_month,
         COUNT(DISTINCT CASE WHEN rd.order_year = cohort.cohort_year AND rd.order_month = cohort.cohort_month THEN rd.customer_id END) AS cohort_size,
-        COUNT(DISTINCT CASE WHEN rd.order_year = cohort.cohort_year AND rd.order_month > cohort.cohort_month THEN rd.customer_id END) AS retained_customers
+        COUNT(DISTINCT CASE WHEN rd.order_year >= cohort.cohort_year AND rd.order_month > cohort.cohort_month THEN rd.customer_id END) AS retained_customers
     FROM cohort
     LEFT JOIN retention_data rd ON cohort.customer_id = rd.customer_id AND cohort.cohort_month = rd.cohort_month
     GROUP BY cohort.cohort_year, cohort.cohort_month
