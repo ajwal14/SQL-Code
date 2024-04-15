@@ -27,7 +27,7 @@ retention_data AS (
         COUNT(DISTINCT o.order_id) AS order_count
     FROM orders o
     INNER JOIN customers c ON o.order_customer_id = c.customer_id
-	  INNER JOIN cohort ch ON c.customer_id=ch.customer_id
+    INNER JOIN cohort ch ON c.customer_id=ch.customer_id
     GROUP BY order_year, order_month, c.customer_id, DATE_TRUNC('month', ch.first_order_date)
 ),
 
